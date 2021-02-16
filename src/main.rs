@@ -7,26 +7,25 @@
 
 #![deny(unsafe_code)]
 #![no_std]
-#![no_main]
+#![cfg_attr(not(doc), no_main)]
 
-// WHY DONT THE PACKAGES WORK WITHOUT THE EXTERN?????
-
-extern crate stm32f1xx_hal;
-extern crate nb;
-extern crate embedded_hal;
-extern crate cortex_m_rt;
-extern crate panic_halt;
-
-use panic_halt as _;
+use rtt_target::{rprintln, rtt_init_print};
+use panic_rtt_target as _;
 
 use nb::block;
 
+use stm32f1xx_hal::{
+    prelude::*,
+    pac,
+    timer::Timer,
+};
 use cortex_m_rt::entry;
 use embedded_hal::digital::v2::OutputPin;
-use stm32f1xx_hal::{pac, prelude::*, timer::Timer};
 
 #[entry]
 fn main() -> ! {
+    // Init buffers for debug printing
+    rtt_init_print!();
     // Get access to the core peripherals from the cortex-m crate
     let cp = cortex_m::Peripherals::take().unwrap();
     // Get access to the device specific peripherals from the peripheral access crate
@@ -48,13 +47,20 @@ fn main() -> ! {
     // in order to configure the port. For pins 0-7, crl should be passed instead.
     let mut led = gpioc.pc13.into_push_pull_output(&mut gpioc.crh);
     // Configure the syst timer to trigger an update every second
-    let mut timer = Timer::syst(cp.SYST, &clocks).start_count_down(1.hz());
+    let mut timer = Timer::syst(cp.SYST, &clocks).start_count_down(10.hz());
 
+    rprintln!("Hello, Rust!");
     // Wait for the timer to trigger an update and change the state of the LED
+    let mut i = 0;
     loop {
         block!(timer.wait()).unwrap();
         led.set_high().unwrap();
         block!(timer.wait()).unwrap();
         led.set_low().unwrap();
+        i += 1;
+        rprintln!("Hello again; I have blinked {} times.", i);
+        if i == 100 {
+            panic!("Yow, 100 times is enough!");
+        }
     }
 }
